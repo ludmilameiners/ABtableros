@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planta ABE — Parte diario y panorama de cargas</title>
+<style>
+  :root{
+    --page:#f8f8f8; --card:#ffffff; --ink:#212529; --deep:#1b1534; --muted:#666666;
+    --hair:#e6e6e6; --purple:#8a00e5; --purple2:#4d217a;
+    --good:#0c8a2f; --crit:#d13438; --warn:#c77700; --warnbg:#fff7e8; --critbg:#fdf0f0; --goodbg:#f2faf4;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--page);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.45}
+  .slab{font-family:"Rockwell","Roboto Slab",Georgia,"Times New Roman",serif;color:var(--deep)}
+  section{min-height:100vh;padding:26px 46px;display:flex;flex-direction:column;justify-content:center;page-break-inside:avoid}
+  h1{font-family:"Rockwell","Roboto Slab",Georgia,serif;font-size:27px;font-weight:700;color:var(--deep);letter-spacing:-.01em}
+  .tag{display:inline-block;background:var(--purple2);color:#fff;font-size:11.5px;font-weight:700;border-radius:6px;padding:3px 10px;vertical-align:6px;margin-left:10px;font-family:"Segoe UI",sans-serif}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .hint{color:var(--purple2);font-size:12px}
+  /* section titles estilo RDS: título slab + hairline */
+  .st{display:flex;align-items:center;gap:14px;margin:20px 0 10px}
+  .st .t{font-family:"Rockwell","Roboto Slab",Georgia,serif;font-size:18.5px;font-weight:700;color:var(--deep);white-space:nowrap}
+  .st .t small{font-family:"Segoe UI",sans-serif;font-weight:400;color:var(--muted);font-size:12.5px}
+  .st::after{content:'';flex:1;height:1px;background:var(--hair)}
+  .card{background:var(--card);border:1px solid #ececec;border-radius:6px;padding:18px 22px;page-break-inside:avoid;box-shadow:0 1px 3px rgba(27,21,52,.05)}
+  .grid2{display:grid;grid-template-columns:1.08fr 1fr;gap:16px}
+  /* KPI estilo myHealth: número grande + subrayado de color + delta */
+  .kpi{text-align:center;padding:10px 8px}
+  .kpi .v{font-size:34px;font-weight:700;color:var(--ink)}
+  .kpi .v small{font-size:15px;font-weight:600;color:var(--muted)}
+  .kpi .ul{height:4px;border-radius:2px;width:70%;margin:8px auto 6px;background:var(--purple)}
+  .kpi .d{font-size:12px;color:var(--muted)}
+  /* flujo generación */
+  .flow{display:flex;align-items:center}
+  .fbx{flex:1;text-align:center;padding:8px 6px;border:1px solid var(--hair);border-radius:6px;background:#fff}
+  .fbx .lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .fbx .num{font-size:24px;font-weight:700}
+  .fbx .pc{font-size:12.5px;font-weight:700}
+  .ul2{height:3px;border-radius:2px;width:64%;margin:6px auto 4px}
+  .gauge{height:10px;border-radius:5px;background:#ececec;overflow:hidden;margin-top:6px}
+  .gauge div{height:100%;background:var(--purple)}
+  /* estado motores estilo "All sites" */
+  .mrow{display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--hair);font-size:13.5px}
+  .mrow:last-of-type{border-bottom:none}
+  .mrow .nm{font-weight:700;color:var(--deep)}
+  .st-run{color:var(--good);font-weight:700}
+  .st-trip{color:var(--crit);font-weight:700}
+  .mrow .mw{font-size:12.5px;color:var(--muted);min-width:110px;text-align:right}
+  .metric{margin-top:12px;border-top:2px solid var(--purple);padding-top:9px;font-size:12.5px;color:var(--purple2);font-weight:700;text-align:center}
+  /* fichas de cargas */
+  .chips{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .chip{background:#fff;border:1px solid var(--hair);border-radius:6px;padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)}
+  .chip .tt{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .chip b{display:block;font-size:16.5px;color:var(--ink);margin:2px 0}
+  .chip .ul3{height:3px;border-radius:2px;width:70%;margin:6px auto 0}
+  .u-ok{background:var(--good)} .u-warn{background:var(--warn)} .u-bad{background:var(--crit)} .u-na{background:#d9d9d9} .u-purple{background:var(--purple)}
+  .minis{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .mini{font-size:12px;font-weight:700;border-radius:99px;padding:4px 12px;border:1px solid var(--hair);background:#fff}
+  .mini.ok{color:var(--good)} .mini.warn{color:var(--warn);border-color:#eed9b0;background:var(--warnbg)}
+  .alert{margin-top:16px;background:#fff;border:1px solid var(--hair);border-left:4px solid var(--crit);border-radius:6px;padding:12px 18px;display:flex;align-items:center;gap:16px}
+  .alert .big{font-size:19px;font-weight:700;color:var(--crit);white-space:nowrap;font-family:"Rockwell","Roboto Slab",Georgia,serif}
+  .alert .txt{font-size:12.5px;color:var(--ink)}
+  /* tabla */
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+  th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--purple2)}
+  td{padding:6.5px 10px;border-bottom:1px solid var(--hair);vertical-align:top}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.bad td{background:var(--critbg)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .d-ok{background:var(--good)} .d-mid{background:var(--warn)} .d-bad{background:var(--crit)} .d-na{background:#c9c9c9}
+  .ev{color:var(--muted)}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:14px 0}
+  .tile{background:#fff;border:1px solid #ececec;border-radius:6px;padding:14px 16px;text-align:center}
+  .tile .v{font-size:27px;font-weight:700}
+  .tile .l{font-size:12px;color:var(--muted);margin-top:6px;text-align:left}
+  .tile .ul{height:4px;border-radius:2px;width:64%;margin:8px auto 0}
+  .neg{color:var(--crit)} .pos{color:var(--good)}
+  .charts{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+  svg text{font-family:"Segoe UI",system-ui,sans-serif}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .causes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  .cause{background:#fff;border:1px solid #ececec;border-radius:6px;padding:14px 16px}
+  .cause h3{font-family:"Rockwell","Roboto Slab",Georgia,serif;font-size:14.5px;color:var(--deep);margin-bottom:4px}
+  .cause p{font-size:12.5px;color:var(--muted)}
+  .badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;padding:2px 8px;border-radius:4px;margin-right:6px;text-transform:uppercase}
+  .b-red{background:var(--critbg);color:var(--crit)} .b-green{background:var(--goodbg);color:var(--good)}
+  .src{font-size:11.5px;color:#999;margin-top:14px}
+  /* burbujas */
+  .pop{position:relative;cursor:pointer}
+  .pop:hover{box-shadow:0 2px 8px rgba(27,21,52,.10)}
+  .bubble{display:none;position:absolute;z-index:60;top:calc(100% + 11px);left:50%;transform:translateX(-50%);width:320px;background:#fff;color:var(--ink);border:1px solid #ddd;border-top:3px solid var(--purple);border-radius:6px;box-shadow:0 14px 34px rgba(27,21,52,.20);padding:12px 14px;font-size:12.5px;font-weight:400;text-align:left;line-height:1.45;cursor:default}
+  .bubble::before{content:'';position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(45deg);width:12px;height:12px;background:var(--purple)}
+  .bubble b{color:var(--deep)}
+  .bubble .q{margin-top:6px;padding:6px 9px;background:#f7f3fc;border-left:3px solid var(--purple2);font-size:12px}
+  .b-right{left:auto;right:0;transform:none}
+  .b-right::before{left:auto;right:22px;transform:rotate(45deg)}
+  .b-left{left:0;transform:none}
+  .b-left::before{left:22px;transform:rotate(45deg)}
+  .pop.open .bubble{display:block}
+  @media print{ section{min-height:auto;padding:18px 24px} body{background:#fff} .bubble{display:none!important} }
+</style>
+</head>
+<body>
+
+<!-- ============ SECCIÓN 1: PARTE DIARIO — GENERACIÓN Y MOTORES ============ -->
+<section>
+  <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">AB Energía S.A. · Planta de biogás · Colonia 25 de Mayo</div>
+  <h1>Qué pasó ayer — miércoles 12/08 <span class="tag">Parte diario</span></h1>
+  <p class="sub">Turnos — noche: Villegas · mañana: Sánchez · tarde: Navarro <span class="hint">· Cada ficha se abre con un clic para ver el detalle y lo que hay que depurar.</span></p>
+
+  <div class="st"><div class="t">Generación <small>· destino de cada MWh</small></div></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="flow">
+        <div class="fbx pop" style="flex:1.15;border:none">
+          <div class="kpi" style="padding:2px">
+            <div class="v">33,18 <small>MWh</small></div>
+            <div class="ul"></div>
+            <div class="d">generados</div>
+          </div>
+          <div class="bubble b-left"><b>La cuenta cierra:</b> 28,75 inyectados + 4,43 de consumo interno = <b>33,18 MWh</b>. La planilla muestra 33,00 porque descuenta 0,18 MWh (−0,55%) de pérdidas de medición en línea.</div>
+        </div>
+        <svg width="60" height="110" viewBox="0 0 60 110" style="flex:none">
+          <path d="M4 55 C 26 55, 26 26, 52 26" fill="none" stroke="#0c8a2f" stroke-width="2.5"/>
+          <path d="M52 26 l-8 -4.5 v9 z" fill="#0c8a2f"/>
+          <path d="M4 55 C 26 55, 26 84, 52 84" fill="none" stroke="#c77700" stroke-width="2.5"/>
+          <path d="M52 84 l-8 -4.5 v9 z" fill="#c77700"/>
+        </svg>
+        <div style="flex:1.15;display:flex;flex-direction:column;gap:8px">
+          <div class="fbx pop">
+            <div class="lbl">Inyectados a la red</div>
+            <div class="num">28,75</div>
+            <div class="ul2 u-ok"></div>
+            <div class="pc" style="color:var(--good)">86,6%</div>
+            <div class="bubble b-right">Es lo que se factura a CAMMESA (medición SMEC): 28,75 de los 33,18 MWh generados.</div>
+          </div>
+          <div class="fbx pop">
+            <div class="lbl">Consumo de la planta</div>
+            <div class="num">4,43</div>
+            <div class="ul2 u-warn"></div>
+            <div class="pc" style="color:var(--warn)">13,4%</div>
+            <div class="bubble b-right">Energía que la planta usa para funcionar (bombas, agitadores, chiller): 4,43 de 33,18 MWh.</div>
+          </div>
+        </div>
+      </div>
+      <div class="pop" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="font-weight:700;color:var(--deep)">Objetivo de inyección: 48 MWh</span><span style="color:var(--crit);font-weight:700;font-size:15px">59,9%</span></div>
+        <div class="gauge"><div style="width:59.9%"></div></div>
+        <div class="bubble"><b>¿Por qué 59,9%?</b> Se inyectaron 28,75 de los 48 MWh objetivo. El motor G1 no arrancó en todo el día por falta de biogás — y el gas que faltó ayer es la consecuencia de las cargas bajas del 9 y 10/08 (26 y 35 Tn). <b>El biogás de hoy se produce con las cargas de ayer y anteayer.</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="mrow pop">
+        <span class="nm">G1 · Maestro</span>
+        <span class="st-trip">✗ Parado (24 hs) — falta de biogás</span>
+        <span class="mw">0 MWh</span>
+        <div class="bubble b-left"><b>Motivo escrito en la planilla:</b> "Parado por falta de bio gas". No es una falla del motor: no había gas suficiente para los tres. <b>Telemetría RDS:</b> solo 47 de 168 hs de servicio en la semana, 125 eventos, y <b>hoy 13/08 figura caído (Tripped) otra vez</b>. <div class="q">A depurar: ¿a qué hora se decidió no arrancarlo y quién lo decidió? ¿Y por qué está caído hoy?</div></div>
+      </div>
+      <div class="mrow pop">
+        <span class="nm">G2 · Esclavo 1</span>
+        <span class="st-run">✔ En marcha (24 hs)</span>
+        <span class="mw">≈ 19 MWh</span>
+        <div class="bubble">Estimado con la telemetría RDS: anduvo a ~800 kW las 24 hs (≈ 19,2 MWh). Semana completa: 168 de 168 hs de servicio, el más estable de los tres. El dato exacto sale del contador de cada motor (FO-002).</div>
+      </div>
+      <div class="mrow pop">
+        <span class="nm">G3 · Esclavo 2</span>
+        <span class="st-run">✔ En marcha (24 hs)</span>
+        <span class="mw">≈ 14 MWh</span>
+        <div class="bubble b-right">Estimado con la telemetría RDS: anduvo a ~600 kW (≈ 14,4 MWh). Ojo: <b>solo 24 hs de servicio en toda la semana</b> — recién arrancó ayer después de días parado.</div>
+      </div>
+      <div class="metric pop">Semana: 239 de 504 horas-motor posibles (47%) · las 24 hs paradas de G1 ayer ≈ 16,5 MWh perdidos
+        <div class="bubble"><b>Las cuentas:</b> RDS suma 239,1 hs de servicio entre los 3 motores esta semana, de 504 posibles (3 × 168). Ayer: 33,18 MWh ÷ 48 horas-motor = 0,69 MWh/h → con G1 en marcha el día terminaba en ~49,7 MWh, prácticamente el objetivo. <b>El faltante es el motor parado, no el rendimiento de los otros dos.</b></div>
+      </div>
+      <div class="src" style="margin-top:8px">Estado y horas por motor: telemetría RDS Guascor (myHealth), 13/08 12:13.</div>
+    </div>
+  </div>
+
+  <div class="alert">
+    <div class="big">✗ 0 avisos</div>
+    <div class="txt pop" style="flex:1"><b>Nadie escribió en el grupo de la planta en todo el día</b> — la carga que faltó se descubrió recién hoy con la planilla. Regla: ante un desvío, corresponde la observación en la planilla <b>o</b> el aviso en el grupo. <u style="color:var(--purple2)">Clic acá para ver la regla completa.</u>
+      <div class="bubble b-right" style="width:360px"><b>Sandra, 13/08 9:12:</b> «Anoche se terminó la última carga de la tolva a las 21:40, y da el tiempo para hacer la otra carga de 7.500 kg que faltaba. Si ven que no van a llegar a hacer alguna carga, den aviso por el grupo… no pueden terminar el día sin completar las cargas sin dar aviso.»<div class="q">Propuesta: si el desvío no está ni en la planilla ni en el grupo, a futuro corresponde informe / sanción.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECCIÓN 1b: PARTE DIARIO — CARGAS ============ -->
+<section>
+  <div class="st"><div class="t">Cargas del 12/08 — Cámara E-01 <small>· 5 cargas en el día · consigna vs real por sustrato</small></div></div>
+  <div class="card">
+    <div class="chips" style="grid-template-columns:repeat(5,1fr)">
+      <div class="chip pop"><span class="tt">1ª · Orujo playón</span><b>21,0 Tn ✓</b>3:44–5:00<div class="ul3 u-ok"></div>
+        <div class="bubble b-left"><b>Turno noche (Villegas).</b> Orujo de playón 20,97 m³ + agua 21,5 m³. Apuntar a 20 Tn → cumplida.</div></div>
+      <div class="chip pop"><span class="tt">2ª · Bosta</span><b>22,0 Tn ✓</b>6:14–7:04<div class="ul3 u-ok"></div>
+        <div class="bubble"><b>Turno mañana (Sánchez).</b> Bosta 22,04 Tn + líquido separado 21,5 m³. Apuntar a 20 → cumplida.</div></div>
+      <div class="chip pop"><span class="tt">3ª · Bosta</span><b>21,5 Tn ✓</b>9:55–11:00<div class="ul3 u-ok"></div>
+        <div class="bubble"><b>Turno mañana (Sánchez).</b> Bosta 21,5 Tn + agua 21,0 m³. Apuntar a 20 → cumplida.</div></div>
+      <div class="chip pop"><span class="tt">4ª · Bosta</span><b style="color:var(--warn)">17,2 Tn</b>14:00–15:30<div class="ul3 u-warn"></div>
+        <div class="bubble"><b>Turno tarde (Navarro).</b> Quedó 2,8 Tn abajo de la consigna de 20. <div class="q">A depurar: ¿el acopio de paladas del turno anterior quedó corto? ¿Cuántas paladas se trajeron y de qué pala? Anotar la equivalencia palada→Tn para la próxima.</div></div></div>
+      <div class="chip pop"><span class="tt">5ª · Orujo corral</span><b>20,4 Tn ✓</b>17:40–20:20<div class="ul3 u-ok"></div>
+        <div class="bubble b-right"><b>Turno tarde (Navarro).</b> Orujo de corrales 20,43 m³ + líquido separado 21,5 m³. Apuntar a 20 → cumplida.</div></div>
+    </div>
+    <div class="minis">
+      <span class="mini ok">Bosta 60,7 / 60 ✓</span>
+      <span class="mini warn pop">Orujo corral 20,4 / 40 m³<span class="bubble b-left"><b>Se cargó la mitad del orujo de corral de la consigna</b> y se compensó con orujo de playón (21,0 contra 15 de consigna). <div class="q">A depurar: ¿no había orujo de corral disponible o fue decisión del turno? Preguntar al turno noche/tarde.</div></span></span>
+      <span class="mini warn pop">Orujo playón 21,0 / 15<span class="bubble"><b>+6 Tn sobre la consigna</b> — es el espejo del faltante de corral (ver ficha anterior).</span></span>
+      <span class="mini ok pop">Grasa 0 / 0 ✓<span class="bubble">La consigna de grasa es 0 — ya no se carga grasa. El casillero de "carga de grasa" que aparece en la planilla es de la plantilla vieja, no una carga que faltó.</span></span>
+      <span class="mini ok">Cloruro férrico 150 / 150 L ✓</span>
+    </div>
+  </div>
+
+  <div class="st"><div class="t">Cargas del 12/08 — Tolva <small>· 6 planificadas → 5 realizadas · la última terminó 21:40</small></div></div>
+  <div class="card">
+    <div class="chips">
+      <div class="chip pop"><span class="tt">1ª · Forraje+maíz</span><b>13,0 Tn ✓</b>2 h 24<div class="ul3 u-ok"></div>
+        <div class="bubble b-left">Bajó a P2 de 5:04 a 6:11 y a P1 de 6:13 a 7:30 (cierre noche → mañana). Ritmo normal.</div></div>
+      <div class="chip pop"><span class="tt">2ª · Forraje+maíz</span><b>13,1 Tn ✓</b>2 h 33<div class="ul3 u-ok"></div>
+        <div class="bubble">Ritmo normal (~2 h y media por carga).</div></div>
+      <div class="chip pop"><span class="tt">3ª · Forr+purín+maíz</span><b>7,5 Tn ✓</b>1 h 15<div class="ul3 u-ok"></div>
+        <div class="bubble">Carga chica con los sólidos de purín (1,5 Tn) — cumplida.</div></div>
+      <div class="chip pop"><span class="tt">4ª · Forraje+vicia</span><b>12,9 Tn ✓</b>2 h 12<div class="ul3 u-ok"></div>
+        <div class="bubble">Con el silo de vicia-triticale (10 Tn del día ✓).</div></div>
+      <div class="chip pop"><span class="tt">5ª · Orujo manzana</span><b>12,8 Tn ✓</b>3 h 17<div class="ul3 u-ok"></div>
+        <div class="bubble b-right">La descarga terminó <b>21:40</b> (cierre del turno tarde). Fue la última del día.</div></div>
+      <div class="chip pop" style="border-color:var(--crit);background:var(--critbg)"><span class="tt" style="color:var(--crit)">6ª · Orujo manzana</span><b style="color:var(--crit)">No se hizo ✗</b>~7,5 Tn<div class="ul3 u-bad"></div>
+        <div class="bubble b-right"><b>Sandra: daba el tiempo para hacerla</b> (la 5ª terminó 21:40) y nadie avisó por el grupo. <div class="q">A depurar: ¿por qué el turno noche no la arrancó? ¿Faltó el acopio del sustrato o fue decisión? ¿Quién debía dejarla preparada?</div></div></div>
+    </div>
+    <div class="minis">
+      <span class="mini ok">Maíz partido 18,3 / 18 ✓</span>
+      <span class="mini ok">Vicia-triticale 10 / 10 ✓</span>
+      <span class="mini ok">Sólidos de purín 1,5 / 1,5 ✓</span>
+      <span class="mini warn pop">Forraje de maíz 22,1 / 32 → −9,9 Tn<span class="bubble b-right"><b>Faltaron casi 10 Tn de forraje en el total del día.</b><div class="q">A depurar: ¿las paladas que se acopiaron del playón se calcularon cortas? Revisar cuántas paladas = 1 carga y quién acopió para cada tolva (suele ser el turno anterior).</div></span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECCIÓN 2: PANORAMA 14 DÍAS ============ -->
+<section>
+  <h1 style="font-size:22px">Los últimos 14 días, en contexto</h1>
+  <p class="sub">Del 30/07 al 12/08 (13/08 en curso) · Fuentes: planilla diaria FO-004 de operación + grupos de WhatsApp de la planta</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="v neg">12 de 13</div><div class="ul u-bad"></div><div class="l">días con cargas de tolva incompletas (el 1/08 no tiene hoja disponible)</div></div>
+    <div class="tile"><div class="v neg">25,9 Tn</div><div class="ul u-bad"></div><div class="l">peor día (9/08): el relé del tornillo rompedor tuvo la tolva parada; recién arrancó a las 21:16</div></div>
+    <div class="tile"><div class="v pos">84,4 Tn</div><div class="ul u-ok"></div><div class="l">mejor día (11/08): con el seteo del sin fin corregido se cumplió el plan completo</div></div>
+    <div class="tile"><div class="v neg">4 días</div><div class="ul u-bad"></div><div class="l">con motor parado por falta de biogás (6, 7, 8/08 y G1 todo el 12/08)</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="card">
+      <div class="st" style="margin:0 0 6px"><div class="t" style="font-size:15px">Toneladas descargadas por tolva, por día</div></div>
+      <p class="sub" style="margin-bottom:4px">Barras: Tn reales · línea punteada: lo alcanzable con el plan completo (~76–83 Tn)</p>
+      <svg viewBox="0 0 640 240" width="100%">
+        <g stroke="#e6e6e6" stroke-width="1">
+          <line x1="40" y1="20" x2="620" y2="20"/><line x1="40" y1="70" x2="620" y2="70"/>
+          <line x1="40" y1="120" x2="620" y2="120"/><line x1="40" y1="170" x2="620" y2="170"/>
+        </g>
+        <line x1="40" y1="200" x2="620" y2="200" stroke="#c9c9c9" stroke-width="1"/>
+        <g fill="#8a8a8a" font-size="10" text-anchor="end">
+          <text x="35" y="23">90</text><text x="35" y="73">60</text><text x="35" y="123">30</text><text x="35" y="203">0</text>
+        </g>
+        <line x1="42" y1="35" x2="369" y2="35" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <line x1="372" y1="47" x2="618" y2="47" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <g fill="#8a00e5">
+          <rect x="46"  y="89"    width="29" height="111"   rx="3"/>
+          <rect x="87"  y="71.4"  width="29" height="128.6" rx="3"/>
+          <rect x="169" y="103.8" width="29" height="96.2"  rx="3"/>
+          <rect x="210" y="87.4"  width="29" height="112.6" rx="3"/>
+          <rect x="251" y="131.6" width="29" height="68.4"  rx="3"/>
+          <rect x="292" y="125"   width="29" height="75"    rx="3"/>
+          <rect x="333" y="71.2"  width="29" height="128.8" rx="3"/>
+          <rect x="374" y="94"    width="29" height="106"   rx="3"/>
+          <rect x="415" y="120.4" width="29" height="79.6"  rx="3"/>
+          <rect x="456" y="148.2" width="29" height="51.8"  rx="3"/>
+          <rect x="497" y="129.2" width="29" height="70.8"  rx="3"/>
+          <rect x="538" y="31.2"  width="29" height="168.8" rx="3"/>
+          <rect x="579" y="81.4"  width="29" height="118.6" rx="3"/>
+        </g>
+        <text x="142.5" y="192" font-size="10" fill="#8a8a8a" text-anchor="middle">s/d</text>
+        <text x="470.5" y="142" font-size="10.5" font-weight="700" fill="#d13438" text-anchor="middle">25,9</text>
+        <text x="552.5" y="25"  font-size="10.5" font-weight="700" fill="#0c8a2f" text-anchor="middle">84,4</text>
+        <text x="593.5" y="75"  font-size="10.5" font-weight="700" fill="#666" text-anchor="middle">59,3</text>
+        <g fill="#8a8a8a" font-size="9.5" text-anchor="middle">
+          <text x="60.5" y="214">30/7</text><text x="101.5" y="214">31/7</text><text x="142.5" y="214">1/8</text>
+          <text x="183.5" y="214">2/8</text><text x="224.5" y="214">3/8</text><text x="265.5" y="214">4/8</text>
+          <text x="306.5" y="214">5/8</text><text x="347.5" y="214">6/8</text><text x="388.5" y="214">7/8</text>
+          <text x="429.5" y="214">8/8</text><text x="470.5" y="214">9/8</text><text x="511.5" y="214">10/8</text>
+          <text x="552.5" y="214">11/8</text><text x="593.5" y="214">12/8</text>
+        </g>
+        <text x="620" y="30" font-size="9.5" fill="#8a8a8a" text-anchor="end">plan</text>
+      </svg>
+      <p class="note">Solo un día de los 13 con datos llegó al plan completo de tolva (11/08). Promedio del período: <b>51 Tn/día</b>, un 37% abajo de lo planificado.</p>
+    </div>
+    <div class="card">
+      <div class="st" style="margin:0 0 6px"><div class="t" style="font-size:15px">Bosta cargada a la cámara (Tn/día)</div></div>
+      <p class="sub" style="margin-bottom:4px">Barras: real · punteada: consigna (50 Tn; 60 Tn desde el 7/08)</p>
+      <svg viewBox="0 0 420 240" width="100%">
+        <g stroke="#e6e6e6" stroke-width="1">
+          <line x1="34" y1="30" x2="405" y2="30"/><line x1="34" y1="86" x2="405" y2="86"/><line x1="34" y1="143" x2="405" y2="143"/>
+        </g>
+        <line x1="34" y1="200" x2="405" y2="200" stroke="#c9c9c9" stroke-width="1"/>
+        <g fill="#8a8a8a" font-size="10" text-anchor="end">
+          <text x="29" y="33">75</text><text x="29" y="89">50</text><text x="29" y="146">25</text><text x="29" y="203">0</text>
+        </g>
+        <line x1="36" y1="86.6" x2="244" y2="86.6" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <line x1="247" y1="64" x2="403" y2="64" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <g fill="#8a00e5">
+          <rect x="38"    y="199" width="19" height="1" rx="1"/>
+          <rect x="64.3"  y="199" width="19" height="1" rx="1"/>
+          <rect x="116.9" y="199" width="19" height="1" rx="1"/>
+          <rect x="143.2" y="83"   width="19" height="117"   rx="3"/>
+          <rect x="169.5" y="87.8" width="19" height="112.2" rx="3"/>
+          <rect x="195.8" y="85.5" width="19" height="114.5" rx="3"/>
+          <rect x="222.1" y="69.6" width="19" height="130.4" rx="3"/>
+          <rect x="248.4" y="199" width="19" height="1" rx="1"/>
+          <rect x="274.7" y="53.8" width="19" height="146.2" rx="3"/>
+          <rect x="301"   y="63.5" width="19" height="136.5" rx="3"/>
+          <rect x="327.3" y="50.2" width="19" height="149.8" rx="3"/>
+          <rect x="353.6" y="64.6" width="19" height="135.4" rx="3"/>
+          <rect x="379.9" y="62.4" width="19" height="137.6" rx="3"/>
+        </g>
+        <g fill="#d13438" font-size="10.5" font-weight="700" text-anchor="middle">
+          <text x="47.5" y="193">0</text><text x="73.8" y="193">0</text><text x="126.4" y="193">0</text><text x="257.9" y="193">0</text>
+        </g>
+        <text x="100.1" y="193" font-size="10" fill="#8a8a8a" text-anchor="middle">s/d</text>
+        <g fill="#8a8a8a" font-size="9.5" text-anchor="middle">
+          <text x="47.5" y="214">30/7</text><text x="100.1" y="214">1/8</text><text x="152.7" y="214">3/8</text>
+          <text x="205.3" y="214">5/8</text><text x="257.9" y="214">7/8</text><text x="310.5" y="214">9/8</text>
+          <text x="363.1" y="214">11/8</text><text x="389.4" y="214">12/8</text>
+        </g>
+      </svg>
+      <p class="note">4 de los 13 días con datos quedaron con la bosta en cero. La bosta es el sustrato base del biogás y su falta pega en la generación 1–2 días después.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECCIÓN 3: DÍA POR DÍA ============ -->
+<section>
+  <div class="st"><div class="t">Día por día: cuánto se cargó y qué pasó</div></div>
+  <div class="card">
+    <p class="sub" style="margin-bottom:8px">Tolva = descarga a los biodigestores (forraje de maíz, maíz partido, vicia, purín, orujo de manzana) · Cámara = bosta y orujo de corral · Eventos según el grupo de WhatsApp (disponible desde el 3/08)</p>
+    <table>
+      <thead><tr><th></th><th>Día</th><th>Tolva</th><th>Cargas hechas</th><th>Bosta (real / consigna)</th><th>Qué pasó</th></tr></thead>
+      <tbody>
+        <tr><td><span class="dot d-mid"></span></td><td class="num">Jue 30/07</td><td class="num">55,5 Tn</td><td class="num">4 de 6</td><td class="num" style="color:var(--crit)"><b>0</b> / 50</td><td class="ev">Sin carga de bosta a cámara registrada.</td></tr>
+        <tr><td><span class="dot d-mid"></span></td><td class="num">Vie 31/07</td><td class="num">64,3 Tn</td><td class="num">4 de 6</td><td class="num" style="color:var(--crit)"><b>0</b> / 50</td><td class="ev">Sin bosta ni orujo de corral a cámara.</td></tr>
+        <tr><td><span class="dot d-na"></span></td><td class="num">Sáb 1/08</td><td class="num" colspan="3">sin datos (la hoja del día no está disponible en la planilla)</td><td class="ev">—</td></tr>
+        <tr><td><span class="dot d-mid"></span></td><td class="num">Dom 2/08</td><td class="num">48,1 Tn</td><td class="num">3 de 6</td><td class="num" style="color:var(--crit)"><b>0</b> / 50</td><td class="ev">Sin bosta; se cargó agua (54 m³, lavado de cámara).</td></tr>
+        <tr><td><span class="dot d-ok"></span></td><td class="num">Lun 3/08</td><td class="num">56,3 Tn</td><td class="num">4 de 6</td><td class="num">51,6 / 50 ✓</td><td class="ev">G3 parado por alta temperatura (cil. 10) · SCADA trabado · saltó el guardamotor de la CCMIX.</td></tr>
+        <tr><td><span class="dot d-bad"></span></td><td class="num">Mar 4/08</td><td class="num">34,2 Tn</td><td class="num">3 de 6</td><td class="num">49,5 / 50 ✓</td><td class="ev">SCADA caído gran parte del día (3 reinicios) · temperatura del chiller alta.</td></tr>
+        <tr><td><span class="dot d-bad"></span></td><td class="num">Mié 5/08</td><td class="num">37,5 Tn</td><td class="num">3 de 6</td><td class="num">50,5 / 50 ✓</td><td class="ev">A la noche: espuma en S1/S2 → cerraron válvulas de biogás · falló la bomba lobular 202.</td></tr>
+        <tr><td><span class="dot d-mid"></span></td><td class="num">Jue 6/08</td><td class="num">64,4 Tn</td><td class="num">4 de 6</td><td class="num">57,5 / 50 ✓</td><td class="ev">Buen día de carga pese a todo: G1 parado 0:19 (gases de cárter) y 12:08 <b>por falta de gas</b> (consecuencia de los días flojos previos) · CCMIX fallando · salida a laguna tapada.</td></tr>
+        <tr class="bad"><td><span class="dot d-bad"></span></td><td class="num">Vie 7/08</td><td class="num">53,0 Tn</td><td class="num">4 de 6</td><td class="num" style="color:var(--crit)"><b>0</b> / 60</td><td class="ev">Arranca la consigna nueva (bosta 60) y quedó en cero · CCMIX no funciona, rebalsa (18:21) · G1 parado 23:27 <b>por falta de biogás</b>.</td></tr>
+        <tr><td><span class="dot d-bad"></span></td><td class="num">Sáb 8/08</td><td class="num">39,8 Tn</td><td class="num">3 de 6</td><td class="num">64,5 / 60 ✓</td><td class="ev">G1 parado 17:48 <b>por falta de gas</b>.</td></tr>
+        <tr class="bad"><td><span class="dot d-bad"></span></td><td class="num">Dom 9/08</td><td class="num"><b>25,9 Tn</b></td><td class="num">2 de 6</td><td class="num">60,2 / 60 ✓</td><td class="ev">El relé del tornillo rompedor falló (13:13, "hace que trabaje mal el motor") y la tolva recién arrancó a las <b>21:16</b>: el día quedó en 2 cargas.</td></tr>
+        <tr><td><span class="dot d-bad"></span></td><td class="num">Lun 10/08</td><td class="num">35,4 Tn</td><td class="num">3 de 6</td><td class="num">66,1 / 60 ✓</td><td class="ev">La 2ª carga tardó <b>12 h 07 min</b> en bajar · a la noche la falla se repitió ("volvió a hacer lo mismo", 21:27) · reclamo por mediciones de H2S sin hacer.</td></tr>
+        <tr><td><span class="dot d-ok"></span></td><td class="num">Mar 11/08</td><td class="num"><b>84,4 Tn</b></td><td class="num">6 de 6 ✓</td><td class="num">59,7 / 60 ✓</td><td class="ev">César corrigió el seteo de corriente del sin fin (8,6→8,9 A) y el PLC dejó de saltar → único día con plan completo · nueva regla: tolva nunca debajo de 4 Tn.</td></tr>
+        <tr class="bad"><td><span class="dot d-bad"></span></td><td class="num">Mié 12/08</td><td class="num">59,3 Tn</td><td class="num">5 de 6</td><td class="num">60,7 / 60 ✓</td><td class="ev">Faltó la última carga (7,5 Tn): la 5ª terminó 21:40 y nadie avisó · <b>G1 parado las 24 h por falta de biogás</b> · generación 33 MWh (59,9% del objetivo de inyección).</td></tr>
+        <tr><td><span class="dot d-mid"></span></td><td class="num">Jue 13/08</td><td class="num" colspan="2">en curso</td><td class="num">— / 60</td><td class="ev">Estator del sin fin ya cambiado · nueva distribución en 6 cargas de tolva de máx. 18,5 Tn · Sandra pidió avisar por el grupo si no llegan.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ SECCIÓN 4: CAUSAS Y ESTADO ============ -->
+<section>
+  <div class="st"><div class="t">Por qué no se llega: las 4 causas, en orden de peso</div></div>
+  <div class="causes">
+    <div class="cause"><h3><span class="badge b-red">Causa 1</span>Tolva lenta por equipo desgastado</h3>
+      <p>El sin fin de la tolva (H-001) venía degradándose: el relé del tornillo rompedor falló el 9/08 (tolva parada casi todo el día), el 10/08 una carga tardó 12 h en bajar, y los seteos de corriente hacían saltar el PLC (corregido el 11/08). <b>El estator ya se cambió (12–13/08)</b> — es la corrección de fondo; verificar esta semana que las cargas vuelvan a 3–4 h.</p></div>
+    <div class="cause"><h3><span class="badge b-red">Causa 2</span>Fallas periféricas que comen el turno</h3>
+      <p>SCADA colgado (3 y 4/08), CCMIX que rebalsa (3, 6 y 7/08), bomba lobular 202 rota (5/08), espuma en S1/S2 que obligó a cerrar válvulas de gas (5/08), salida a laguna tapada (6/08). Cada evento distrae al operador de turno y corre las cargas.</p></div>
+    <div class="cause"><h3><span class="badge b-red">Causa 3</span>Bosta a cámara irregular</h3>
+      <p>4 días en cero (30 y 31/07, 2 y 7/08). La bosta es la base de la generación: los ceros de fin de julio y del 7/08 explican buena parte de las paradas por falta de gas del 6–8/08 (el biogás responde con 1–2 días de rezago). Desde el 8/08 la bosta viene cumplida todos los días.</p></div>
+    <div class="cause"><h3><span class="badge b-red">Causa 4</span>Arranques tarde y sin aviso</h3>
+      <p>El 9/08 la tolva arrancó 21:16; el 12/08 quedó una carga sin hacer y nadie escribió en el grupo en todo el día: el problema se descubre al día siguiente, cuando ya no se puede corregir. Sandra lo formalizó el 13/08 como regla.</p></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <p style="font-size:13px"><b>La cadena completa:</b> tolva lenta + bosta irregular → menos sustrato en los biodigestores → menos biogás 1–2 días después → motores parados por falta de gas (6, 7, 8/08 y G1 todo el 12/08) → menos generación. La falta de biogás es el síntoma; la causa está en las cargas de los días previos.</p>
+    <p style="font-size:13px;margin-top:8px"><b>Ya corregido o en marcha:</b> <span class="badge b-green">estator cambiado</span> <span class="badge b-green">seteo sin fin corregido (11/08)</span> <span class="badge b-green">tolva mínimo 4 Tn (11/08)</span> <span class="badge b-green">6 cargas ≤ 18,5 Tn (13/08)</span> <span class="badge b-green">regla de avisar por el grupo (13/08)</span> — el 11/08 demostró que con el equipo sano el plan completo (84 Tn) es alcanzable.</p>
+    <p class="src">Fuentes: planillas de operación FO-004 (hojas diarias de "07-2026" y "08-2026" en Sheets), foto de cierre del grupo "Generación Energía Diaria" (12/08) y grupo de WhatsApp de la planta. El historial de WhatsApp anterior al 3/08 no sincronizó y la hoja del 1/08 no está disponible, por eso esos días tienen datos parciales. Día 13/08 en curso al momento del informe.</p>
+  </div>
+</section>
+
+<script>
+document.addEventListener('click', function(e){
+  var bubbleClick = e.target.closest('.bubble');
+  var p = e.target.closest('.pop');
+  document.querySelectorAll('.pop.open').forEach(function(x){ if (x !== p) x.classList.remove('open'); });
+  if (p && !bubbleClick) p.classList.toggle('open');
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') document.querySelectorAll('.pop.open').forEach(function(x){ x.classList.remove('open'); });
+});
+</script>
+</body>
+</html>
